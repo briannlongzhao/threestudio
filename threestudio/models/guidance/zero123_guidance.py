@@ -68,9 +68,9 @@ def load_model_from_config(
         model.model_ema.copy_to(model.model)
         del model.model_ema
 
-    if vram_O:
-        # we don't need decoder
-        del model.first_stage_model.decoder
+    # if vram_O:
+    #     # we don't need decoder
+    #     del model.first_stage_model.decoder
 
     torch.cuda.empty_cache()
 
@@ -106,6 +106,8 @@ class Zero123Guidance(BaseObject):
 
         """Maximum number of batch items to evaluate guidance for (for debugging) and to save on disk. -1 means save all items."""
         max_items_eval: int = 4
+
+        dass_steps: int = 0
 
     cfg: Config
 
@@ -273,6 +275,7 @@ class Zero123Guidance(BaseObject):
         camera_distances: Float[Tensor, "B"],
         rgb_as_latents=False,
         guidance_eval=False,
+        dass=False,
         **kwargs,
     ):
         batch_size = rgb.shape[0]
@@ -332,8 +335,23 @@ class Zero123Guidance(BaseObject):
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
         loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
+        if dass:
+            target_dass_512 = self.dass_eval(cond, t, latents_noisy, noise_pred)
+            target_dass = F.interpolate(
+                target_dass_512.permute(0, 3, 1, 2),
+                rgb_BCHW.shape[-2:],
+                mode="bilinear",
+                align_corners=False,
+            ).detach()
+            loss_dass = (
+                0.5 * F.mse_loss(rgb_BCHW, target_dass, reduction="sum") / batch_size
+            )
+        else:
+            loss_dass = 0
+
         guidance_out = {
             "loss_sds": loss_sds,
+            "loss_dass": loss_dass,
             "grad_norm": grad.norm(),
             "min_step": self.min_step,
             "max_step": self.max_step,
@@ -358,6 +376,65 @@ class Zero123Guidance(BaseObject):
             guidance_out.update({"eval": guidance_eval_out})
 
         return guidance_out
+
+    @torch.cuda.amp.autocast(enabled=False)
+    @torch.no_grad()
+    def dass_eval(self, cond, t_orig, latents_noisy, noise_pred):
+        # use only 50 timesteps, and find nearest of those to t
+        self.scheduler.set_timesteps(50)
+        self.scheduler.timesteps_gpu = self.scheduler.timesteps.to(self.device)
+        bs = latents_noisy.shape[0]
+        # find time step in new 50-schedule
+        large_enough_idxs = self.scheduler.timesteps_gpu.expand([bs, -1]) > t_orig[
+            :bs
+        ].unsqueeze(
+            -1
+        )  # sized [bs,50] > [bs,1]
+        idxs = torch.min(large_enough_idxs, dim=1)[1]
+        t = self.scheduler.timesteps_gpu[idxs]
+
+        # get prev latent
+        latents_1step = []
+        for b in range(bs):
+            step_output = self.scheduler.step(
+                noise_pred[b : b + 1], t[b], latents_noisy[b : b + 1], eta=1
+            )
+            latents_1step.append(step_output["prev_sample"])
+        latents_1step = torch.cat(latents_1step)
+
+        if self.cfg.dass_steps == 1:
+            latents_final = latents_1step
+        else:
+            latents_final = []
+            for b, i in enumerate(idxs):
+                latents = latents_1step[b : b + 1]
+                c = {
+                    "c_crossattn": [cond["c_crossattn"][0][[b, b + len(idxs)], ...]],
+                    "c_concat": [cond["c_concat"][0][[b, b + len(idxs)], ...]],
+                }
+                for t in tqdm(
+                    self.scheduler.timesteps[i + 1 : i + self.cfg.dass_steps],
+                    leave=False,
+                ):
+                    # pred noise
+                    x_in = torch.cat([latents] * 2)
+                    t_in = torch.cat([t.reshape(1)] * 2).to(self.device)
+                    noise_pred = self.model.apply_model(x_in, t_in, c)
+                    # perform guidance
+                    noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
+                    noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
+                        noise_pred_cond - noise_pred_uncond
+                    )
+                    # get prev latent
+                    latents = self.scheduler.step(noise_pred, t, latents, eta=1)[
+                        "prev_sample"
+                    ]
+                latents_final.append(latents)
+            latents_final = torch.cat(latents_final)
+
+        imgs_final = self.decode_latents(latents_final).permute(0, 2, 3, 1)
+
+        return imgs_final
 
     @torch.cuda.amp.autocast(enabled=False)
     @torch.no_grad()

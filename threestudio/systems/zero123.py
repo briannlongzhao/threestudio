@@ -87,6 +87,10 @@ class Zero123(BaseLift3DSystem):
             and self.true_global_step % self.cfg.freq.guidance_eval == 0
         )
 
+        dass = (
+            self.C(self.cfg.loss.lambda_dass) > 0 and self.guidance.cfg.dass_steps > 0
+        )
+
         if guidance == "ref":
             gt_mask = batch["mask"]
             gt_rgb = batch["rgb"]
@@ -139,9 +143,12 @@ class Zero123(BaseLift3DSystem):
                 **batch,
                 rgb_as_latents=False,
                 guidance_eval=guidance_eval,
+                dass=dass,
             )
             # claforte: TODO: rename the loss_terms keys
             set_loss("sds", guidance_out["loss_sds"])
+            if dass:
+                set_loss("dass", guidance_out["loss_dass"])
 
         if self.C(self.cfg.loss.lambda_normal_smooth) > 0:
             if "comp_normal" not in out:

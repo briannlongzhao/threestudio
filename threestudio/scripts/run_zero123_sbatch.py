@@ -5,7 +5,7 @@ files = [
     ["~/git/threestudio/load/images/anya_front_rgba.png", 5.0],
     ["~/git/threestudio/load/images/baby_phoenix_on_ice_rgba.png", 5.0],
     ["~/git/threestudio/load/images/beach_house_1_rgba.png", 30.0],
-    ["~/git/threestudio/load/images/beach_house_2_rgba.png", 5.0],
+    ["~/git/threestudio/load/images/beach_house_2_rgba.png", 20.0],
     ["~/git/threestudio/load/images/bollywood_actress_rgba.png", 5.0],
     ["~/git/threestudio/load/images/boy1_rgba.png", 5.0],
     ["~/git/threestudio/load/images/boy2_rgba.png", 5.0],
@@ -82,8 +82,6 @@ files = [
     ["~/git/threestudio/load/images/boy2_rgba.png", 5.0],
     ["~/git/threestudio/load/images/bull2_rgba.png", 5.0],
     ["~/git/threestudio/load/images/castle1_rgba.png", 5.0],
-    ["~/git/threestudio/load/images/church_ruins_rgba.png", -5.0],
-    ["~/git/threestudio/load/images/corgi_rgba.png", 5.0],
     ["~/git/threestudio/load/images/crystalpiano_rgba.png", 15.0],
     ["~/git/threestudio/load/images/dad3_rgba.png", 5.0],
     ["~/git/threestudio/load/images/dancer1_rgba.png", 5.0],
@@ -102,52 +100,38 @@ files = [
     ["~/git/threestudio/load/images/globe1_rgba.png", 5.0],
     ["~/git/threestudio/load/images/grootplant_rgba.png", 5.0],
     ["~/git/threestudio/load/images/hero2_rgba.png", 5.0],
-    ["~/git/threestudio/load/images/hiker1_rgba.png", 5.0],
     ["~/git/threestudio/load/images/hiker2_rgba.png", 5.0],
-    ["~/git/threestudio/load/images/hiker3_rgba.png", 5.0],
-    ["~/git/threestudio/load/images/hiker4_rgba.png", 5.0],
     ["~/git/threestudio/load/images/horse2_rgba.png", 5.0],
     ["~/git/threestudio/load/images/invention2_rgba.png", 5.0],
     ["~/git/threestudio/load/images/km4_rgba.png", 5.0],
     ["~/git/threestudio/load/images/km7_rgba.png", 5.0],
     ["~/git/threestudio/load/images/km8_rgba.png", 15.0],
-    ["~/git/threestudio/load/images/labrador6_rgba.png", 5.0],
-    ["~/git/threestudio/load/images/labrador8_rgba.png", 5.0],
     ["~/git/threestudio/load/images/lawyer1_rgba.png", 5.0],
     ["~/git/threestudio/load/images/lightningtree_rgba.png", 5.0],
     ["~/git/threestudio/load/images/mouse1_rgba.png", 5.0],
     ["~/git/threestudio/load/images/nendoroid_obama1_rgba.png", 5.0],
-    ["~/git/threestudio/load/images/pilot1_rgba.png", 5.0],
-    ["~/git/threestudio/load/images/retriever6_rgba.png", 5.0],
-    ["~/git/threestudio/load/images/retriever7_rgba.png", 5.0],
     ["~/git/threestudio/load/images/robot_rgba.png", 5.0],
     ["~/git/threestudio/load/images/sadhu1_rgba.png", 5.0],
-    ["~/git/threestudio/load/images/sadhu2_rgba.png", 5.0],
     ["~/git/threestudio/load/images/sarasvatee1_rgba.png", 5.0],
-    ["~/git/threestudio/load/images/sarasvatee2_rgba.png", 5.0],
     ["~/git/threestudio/load/images/sofa_rgba.png", 5.0],
     ["~/git/threestudio/load/images/teapot_rgba.png", 5.0],
     ["~/git/threestudio/load/images/teddy_rgba.png", 5.0],
     ["~/git/threestudio/load/images/temple1_rgba.png", 30.0],
     ["~/git/threestudio/load/images/temple2_rgba.png", 5.0],
-    ["~/git/threestudio/load/images/temple3_rgba.png", 5.0],
     ["~/git/threestudio/load/images/thorhammer_rgba.png", 5.0],
     ["~/git/threestudio/load/images/woman1_rgba.png", 5.0],
     ["~/git/threestudio/load/images/woman3_rgba.png", 5.0],
     ["~/git/threestudio/load/images/woman5_rgba.png", 5.0],
-    ["~/git/threestudio/load/images/yoga1_rgba.png", 5.0],
     ["~/git/threestudio/load/images/yoga2_rgba.png", 5.0],
-    ["~/git/threestudio/load/images/yoga3_rgba.png", 5.0],
 ]
 
 
-config = "sai"
-model = "sai"
-
+config = "2xl_artic3d"
+model = "xl"
+wandb = "true"
+project = "zero123_artic3d_comp"
 for fileelev in files:
     file, elev = fileelev
-    config = "sai"
-    model = "sai"
     name = os.path.basename(file).split("_rgba.png")[0]
     with open(
         os.path.expanduser("~/git/threestudio/threestudio/scripts/zero123_sbatch.sh"),
@@ -158,16 +142,18 @@ for fileelev in files:
         f.write("#SBATCH --account=mod3d\n")
         f.write("#SBATCH --partition=g40\n")
         f.write("#SBATCH --gpus=1\n")
-        f.write("#SBATCH --time=0-00:15:00\n")
+        f.write("#SBATCH --time=0-00:30:00\n")
         f.write("conda activate three\n")
         f.write("cd ~/git/threestudio/\n")
         f.write(f"NAME={name}\n")
         f.write(f"CONFIG={config}\n")
         f.write(f"MODEL={model}\n")
         f.write(f"ELEV={elev}\n")
+        f.write(f"WANDB={wandb}\n")
+        f.write(f"PROJECT={project}\n")
         # Phase 1
         f.write(
-            "python launch.py --config configs/zero123_${CONFIG}.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png system.guidance.pretrained_model_name_or_path=./load/zero123/zero123-${MODEL}.ckpt use_timestamp=false name=SAI/${NAME} tag=Phase1_${CONFIG}config_${MODEL}model_${ELEV}elev_sp0.1to0.5 data.default_elevation_deg=${ELEV} system.loggers.wandb.enable=false system.loggers.wandb.project='zero123_SAIconfig_comp' system.loggers.wandb.name=${NAME}_${CONFIG}config_${MODEL}model_${ELEV}elev\n"
+            "python launch.py --config configs/zero123_${CONFIG}.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png system.guidance.pretrained_model_name_or_path=./load/zero123/zero123-${MODEL}.ckpt use_timestamp=false name=ARTIC3D/${NAME} tag=Phase1_${CONFIG}config_${MODEL}model_${ELEV}elev_dass0 data.default_elevation_deg=${ELEV} system.loggers.wandb.enable=${WANDB} system.loggers.wandb.project=${PROJECT} system.loggers.wandb.name=${NAME}_${CONFIG}config0dass_${MODEL}model_${ELEV}elev # system.freq.guidance_eval=10 trainer.val_check_interval=25 \n"
         )
     os.system("sbatch ~/git/threestudio/threestudio/scripts/zero123_sbatch.sh")
     time.sleep(1)

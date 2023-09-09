@@ -209,6 +209,9 @@ class PromptProcessor(BaseObject):
         # index of words that can potentially be removed
         prompt_debiasing_mask_ids: Optional[List[int]] = None
 
+        # prompt_learner checkpoint
+        ckpt_path: str = ""
+
     cfg: Config
 
     @rank_zero_only
@@ -220,6 +223,7 @@ class PromptProcessor(BaseObject):
         raise NotImplementedError
 
     def configure(self) -> None:
+        self.prompt_learner = None
         self._cache_dir = ".threestudio_cache/text_embeddings"  # FIXME: hard-coded path
 
         # view-dependent text embeddings
@@ -336,8 +340,8 @@ class PromptProcessor(BaseObject):
         self.prepare_text_embeddings()
         self.load_text_embeddings()
 
-    @staticmethod
-    def spawn_func(pretrained_model_name_or_path, prompts, cache_dir):
+    # @staticmethod
+    def spawn_func(self, pretrained_model_name_or_path, prompts, cache_dir):
         raise NotImplementedError
 
     @rank_zero_only

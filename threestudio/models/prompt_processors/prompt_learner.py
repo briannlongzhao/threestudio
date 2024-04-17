@@ -339,6 +339,10 @@ class PromptLearner(nn.Module):
             self.fixed_ctx = self.ctx
         else:
             assert self.n_cls == 1
+            if self.means is None or self.stds is None:
+                self.fit()
+            self.fixed_ctx = self.sample([0])
+
             self.ctx_means = np.empty((self.n_cls, self.n_ctx, self.ctx_dim))  # (1*8*1024)
             self.ctx_stds = np.empty(self.ctx_means.shape)
             self.prompt_texts = []
@@ -353,6 +357,7 @@ class PromptLearner(nn.Module):
             self.fixed_ctx = torch.from_numpy()
 
     # Only used in customization
+    # Input prompts include views (cat toy, top view), therefore text encoder here after concat
     def generate_from_fixed_ctx(self, prompts: list):
         assert self.fixed_ctx is not None
         if self.pdl:
